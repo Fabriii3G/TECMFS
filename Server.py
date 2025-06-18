@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify
 from DataStructures.block_array import BlockArray
 from DataStructures.hashmap import HashMap
