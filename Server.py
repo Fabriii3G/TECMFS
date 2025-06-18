@@ -171,6 +171,41 @@ def download_file():
         "data": list(file_bytes)
     }), 200
 
+@app.route('/list_files', methods=['GET'])
+def list_files():
+    files = set()
+    for i in range(block_map.size):
+        entry = block_map.table[i]
+        if entry:
+            filename = entry.key.split('_block_')[0]
+            files.add(filename)
+    return jsonify({"files": list(files)}), 200
+
+@app.route('/delete_file', methods=['DELETE'])
+def delete_file():
+    filename = request.args.get('filename')
+    if not filename:
+        return jsonify({"error": "Se requiere el nombre del archivo"}), 400
+
+    deleted_blocks = 0
+
+    for i in range(block_map.size):
+        entry = block_map.table[i]
+        if entry and entry.key.startswith(f"{filename}_block_"):
+            node_index = entry.value
+            block_id = entry.key
+            try:
+                requests.delete(f"{DISK_NODES[node_index]}/delete_block", params={"block_id": block_id})
+            except Exception as e:
+                print(f"[WARNING] No se pudo eliminar {block_id} de nodo {node_index}: {e}")
+            block_map.table[i] = None
+            deleted_blocks += 1
+
+    if deleted_blocks == 0:
+        return jsonify({"message": "No se encontraron bloques para este archivo"}), 404
+
+    return jsonify({"message": f"Archivo '{filename}' eliminado ({deleted_blocks} bloques)"}), 200
+
 
 # Iniciar servidor del Controller Node
 if __name__ == '__main__':
