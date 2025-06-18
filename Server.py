@@ -43,6 +43,7 @@ def distribute_blocks(filename, file_data):
     group_size = len(DISK_NODES) - 1
     group_index = 0
     i = 0
+    current_block_index = 0  # Usar bloque global 
 
     while i < blocks.length():
         chunk = BlockArray(group_size)
@@ -64,7 +65,10 @@ def distribute_blocks(filename, file_data):
         for node_index in range(len(DISK_NODES)):
             dest_node = (group_index + node_index) % len(DISK_NODES)
             block_data = full_group.get(node_index)
-            block_id = f"{filename}_block_{i + node_index}"
+
+            block_id = f"{filename}_block_{current_block_index}"
+            current_block_index += 1
+
             block_map.put(block_id, dest_node)
 
             response = requests.post(
@@ -104,6 +108,69 @@ def read_block():
 
     response = requests.get(f"{DISK_NODES[node_index]}/read_block", params={"block_id": block_id})
     return jsonify(response.json()), response.status_code
+
+@app.route('/download_file', methods=['GET'])
+def download_file():
+    filename = request.args.get('filename')
+    if not filename:
+        return jsonify({"error": "Se requiere el nombre del archivo"}), 400
+
+    total_blocks = []
+    group_size = len(DISK_NODES) - 1
+    current_block_index = 0
+
+    while True:
+        full_group = []
+        successful_reads = 0
+        missing_index = -1
+
+        # Leer un grupo completo (datos + paridad)
+        for i in range(len(DISK_NODES)):
+            block_id = f"{filename}_block_{current_block_index}"
+            current_block_index += 1
+
+            node_index = block_map.get(block_id)
+            if node_index is None:
+                break  # Fin del archivo
+
+            try:
+                response = requests.get(f"{DISK_NODES[node_index]}/read_block", params={"block_id": block_id})
+                if response.status_code == 200:
+                    data = bytes(response.json()["data"])
+                    full_group.append(data)
+                    successful_reads += 1
+                else:
+                    full_group.append(None)
+                    missing_index = i
+            except Exception:
+                full_group.append(None)
+                missing_index = i
+
+        if successful_reads == 0:
+            break
+
+        # Reconstruir bloque perdido si es necesario
+        if missing_index != -1:
+            recovered = bytearray(BLOCK_SIZE)
+            for byte_i in range(BLOCK_SIZE):
+                val = 0
+                for j, block in enumerate(full_group):
+                    if j != missing_index and block is not None:
+                        val ^= block[byte_i]
+                recovered[byte_i] = val
+            full_group[missing_index] = bytes(recovered)
+
+        # Agregar solo los bloques de datos (no la paridad)
+        for i in range(group_size):
+            total_blocks.append(full_group[i])
+
+    file_bytes = b''.join(total_blocks).rstrip(b'\x00')
+
+    return jsonify({
+        "filename": filename,
+        "data": list(file_bytes)
+    }), 200
+
 
 # Iniciar servidor del Controller Node
 if __name__ == '__main__':

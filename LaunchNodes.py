@@ -1,9 +1,12 @@
 import subprocess
 import time
 import os
+import sys
+
+PYTHON_PATH = sys.executable
 
 # Ruta al intérprete de Python del entorno virtual
-PYTHON_PATH = os.path.join("venv", "Scripts", "python.exe")
+#PYTHON_PATH = os.path.join("venv", "Scripts", "python.exe")
 
 # Verifica que el ejecutable exista
 if not os.path.exists(PYTHON_PATH):
