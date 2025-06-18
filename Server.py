@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from DataStructures.block_array import BlockArray
 from DataStructures.hashmap import HashMap
+from flask import render_template_string
 import requests
 import os
 
@@ -133,7 +134,11 @@ def download_file():
                 break  # Fin del archivo
 
             try:
-                response = requests.get(f"{DISK_NODES[node_index]}/read_block", params={"block_id": block_id})
+                response = requests.get(
+                    f"{DISK_NODES[node_index]}/read_block",
+                    params={"block_id": block_id},
+                    timeout=1.5  # agregado: timeout para evitar congelamientos
+                )
                 if response.status_code == 200:
                     data = bytes(response.json()["data"])
                     full_group.append(data)
@@ -146,9 +151,13 @@ def download_file():
                 missing_index = i
 
         if successful_reads == 0:
-            break
+            break  # Ya no hay mas bloques
 
-        # Reconstruir bloque perdido si es necesario
+        # Si hay mas de un bloque perdido, no se puede reconstruir
+        if full_group.count(None) > 1:
+            return jsonify({"error": "No se pudo recuperar: múltiples bloques perdidos"}), 500
+
+        # Reconstruir si hay un bloque perdido
         if missing_index != -1:
             recovered = bytearray(BLOCK_SIZE)
             for byte_i in range(BLOCK_SIZE):
@@ -169,6 +178,7 @@ def download_file():
         "filename": filename,
         "data": list(file_bytes)
     }), 200
+
 
 @app.route('/list_files', methods=['GET'])
 def list_files():
@@ -204,6 +214,54 @@ def delete_file():
         return jsonify({"message": "No se encontraron bloques para este archivo"}), 404
 
     return jsonify({"message": f"Archivo '{filename}' eliminado ({deleted_blocks} bloques)"}), 200
+
+@app.route('/status_view', methods=['GET'])
+def status_view():
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Estado de Bloques - TECMFS</title>
+        <style>
+            table { border-collapse: collapse; width: 80%; margin: auto; }
+            th, td { border: 1px solid #aaa; padding: 8px; text-align: center; }
+            th { background-color: #eee; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            h2 { text-align: center; }
+            .parity { color: red; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <h2>Estado de los bloques en los nodos RAID</h2>
+        <table>
+            <tr><th>Bloque</th><th>Asignado a Nodo</th><th>Tipo</th></tr>
+            {% for key, node, tipo in data %}
+            <tr>
+                <td>{{ key }}</td>
+                <td>{{ node }}</td>
+                <td class="{{ 'parity' if tipo == 'paridad' else '' }}">{{ tipo }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </body>
+    </html>
+    """
+
+    blocks = []
+    group_size = len(DISK_NODES) - 1
+    for i in range(block_map.size):
+        entry = block_map.table[i]
+        if entry:
+            block_id = entry.key
+            index_str = block_id.split("_block_")[-1]
+            try:
+                index = int(index_str)
+                tipo = "paridad" if (index % len(DISK_NODES)) == group_size else "dato"
+            except:
+                tipo = "desconocido"
+            blocks.append((block_id, entry.value, tipo))
+
+    return render_template_string(html, data=blocks)
 
 
 # Iniciar servidor del Controller Node
