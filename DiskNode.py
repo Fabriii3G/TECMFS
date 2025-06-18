@@ -40,6 +40,14 @@ def read_block():
         return jsonify({"error": "Block not found"}), 404
     return jsonify({"block_id": block_id, "data": content}), 200
 
+@app.route('/delete_block', methods=['DELETE'])
+def delete_block():
+    block_id = request.args.get('block_id')
+    if block_id in block_storage:
+        del block_storage[block_id]
+        return jsonify({"message": f"Bloque {block_id} eliminado"}), 200
+    return jsonify({"error": "Bloque no encontrado"}), 404
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print("Uso: python disk_node.py <archivo_config.xml>")
