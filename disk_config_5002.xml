@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<DiskConfig>
+	<Port>5002</Port>
+	<MaxBlocks>5000</MaxBlocks>
+	<BlockSize>1024</BlockSize>
+</DiskConfig>
