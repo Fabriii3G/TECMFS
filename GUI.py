@@ -68,8 +68,11 @@ class TECMFSClientApp:
             if response.status_code == 200:
                 files = response.json().get("files", [])
                 self.file_listbox.delete(0, tk.END)
+
+                # Mostrar solo archivos que terminan en .pdf
                 for name in files:
-                    self.file_listbox.insert(tk.END, name)
+                    if name.lower().endswith('.pdf'):
+                        self.file_listbox.insert(tk.END, name)
             else:
                 messagebox.showerror("Error", "No se pudo obtener la lista de archivos.")
         except Exception as e:
