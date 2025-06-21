@@ -3,8 +3,8 @@ import time
 import os
 import sys
 
-#YTHON_PATH = os.path.join("venv", "Scripts", "python.exe")
-PYTHON_PATH = sys.executable
+PYTHON_PATH = os.path.join("venv", "Scripts", "python.exe")
+#PYTHON_PATH = sys.executable
 ports = [5001, 5002, 5003, 5004]
 
 for port in ports:
